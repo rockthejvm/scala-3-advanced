@@ -1,5 +1,7 @@
 package com.rockthejvm.part2afp
 
+import scala.annotation.targetName
+
 object Monads {
 
   def listStory(): Unit = {
@@ -70,8 +72,85 @@ object Monads {
 
   // MONADS = chain dependent computations
 
+  // exercise: IS THIS A MONAD?
+  // answer: IT IS A MONAD!
+  // interpretation: ANY computation that might perform side effects
+  case class IO[A](unsafeRun: () => A) {
+    def map[B](f: A => B): IO[B] =
+      IO(() => f(unsafeRun()))
+
+    def flatMap[B](f: A => IO[B]): IO[B] =
+      IO(() => f(unsafeRun()).unsafeRun())
+  }
+
+  object IO {
+    @targetName("pure")
+    def apply[A](value: => A): IO[A] =
+      new IO(() => value)
+  }
+
+  def possiblyMonadStory(): Unit = {
+    val aPossiblyMonad = IO(42)
+    val f = (x: Int) => IO(x + 1)
+    val g = (x: Int) => IO(2 * x)
+    val pure = (x: Int) => IO(x)
+
+    // prop 1: left-identity
+    val leftIdentity = pure(42).flatMap(f) == f(42)
+
+    // prop 2: right-identity
+    val rightIdentity = aPossiblyMonad.flatMap(pure) == aPossiblyMonad
+
+    // prop 3: associativity
+    val associativity = aPossiblyMonad.flatMap(f).flatMap(g) == aPossiblyMonad.flatMap(x => f(x).flatMap(g))
+
+    println(leftIdentity)
+    println(rightIdentity)
+    println(associativity)
+    println(IO(3) == IO(3))
+    // ^^ false negative.
+
+    // real tests: values produced + side effect ordering
+    val leftIdentity_v2 = pure(42).flatMap(f).unsafeRun() == f(42).unsafeRun()
+    val rightIdentity_v2 = aPossiblyMonad.flatMap(pure).unsafeRun() == aPossiblyMonad.unsafeRun()
+    val associativity_v2 = aPossiblyMonad.flatMap(f).flatMap(g).unsafeRun() == aPossiblyMonad.flatMap(x => f(x).flatMap(g)).unsafeRun()
+
+    println(leftIdentity_v2)
+    println(rightIdentity_v2)
+    println(associativity_v2)
+
+    val fs = (x: Int) => IO {
+      println("incrementing")
+      x + 1
+    }
+
+    val gs = (x: Int) => IO {
+      println("doubling")
+      x * 2
+    }
+
+    val associativity_v3 = aPossiblyMonad.flatMap(fs).flatMap(gs).unsafeRun() == aPossiblyMonad.flatMap(x => fs(x).flatMap(gs)).unsafeRun()
+  }
+
+  def possiblyMonadExample(): Unit = {
+    val aPossiblyMonad = IO {
+      println("printing my first possibly monad")
+      // do some computations
+      42
+    }
+
+    val anotherPM = IO {
+      println("my second PM")
+      "Scala"
+    }
+
+    val aForComprehension = for { // computations are DESCRIBED, not EXECUTED
+      num <- aPossiblyMonad
+      lang <- anotherPM
+    } yield s"$num-$lang"
+  }
 
   def main(args: Array[String]): Unit = {
-
+    possiblyMonadStory()
   }
 }
