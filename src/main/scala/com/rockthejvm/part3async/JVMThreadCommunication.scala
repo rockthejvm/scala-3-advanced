@@ -160,7 +160,7 @@ object ProdConsV4 {
       while (true) {
         buffer.synchronized {
           /*
-            we need to constantly check if the buffer is empty - scenario:
+            we need to constantly check if the buffer is empty - otherwise, crashing scenario:
               one producer, two consumers
               producer produces 1 value in the buffer
               both consumers are waiting
@@ -177,9 +177,8 @@ object ProdConsV4 {
           val newValue = buffer.dequeue()
           println(s"[consumer $id] consumed $newValue")
 
-          // notify a producer
           /*
-            We need to use notifyAll. Otherwise:
+            We need to use notifyAll. Otherwise, deadlock scenario:
               Scenario: 2 producers, one consumer, capacity = 1
                 producer1 produces a value, then waits
                 producer2 sees buffer full, waits
@@ -188,7 +187,7 @@ object ProdConsV4 {
                 producer1 produces a value, calls notify - signal goes to producer2
                 producer1 sees buffer full, waits
                 producer2 sees buffer full, waits
-                deadlock
+                DEADLOCK
            */
           buffer.notifyAll() // signal all the waiting threads on the buffer
         }
@@ -214,9 +213,10 @@ object ProdConsV4 {
           println(s"[producer $id] producing $currentCount")
           buffer.enqueue(currentCount)
 
-          // wake up a consumer
+          // wake up everyone (similar/symmetrical deadlocking scenario: see producer code)
           buffer.notifyAll()
 
+          // upcoming produced value
           currentCount += 1
         }
 
