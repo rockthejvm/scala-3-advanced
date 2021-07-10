@@ -5,7 +5,7 @@ import scala.util.Random
 
 object JVMThreadCommunication {
   def main(args: Array[String]): Unit = {
-    ProdConsV3.start(1)
+    ProdConsV4.start(4, 2, 5)
   }
 }
 
@@ -26,7 +26,7 @@ class SimpleContainer {
   }
 }
 
-// PC part 1: one producer, one consumer
+// one producer, one consumer, busy waiting
 object ProdConsV1 {
   def start(): Unit = {
     val container = new SimpleContainer
@@ -144,5 +144,93 @@ object ProdConsV3 {
 
     consumer.start()
     producer.start()
+  }
+}
+
+/*
+   large container, multiple producers/consumers
+   producer1 -> [ _ _ _ ] -> consumer1
+   producer2 ---^       +---> consumer2
+ */
+object ProdConsV4 {
+  class Consumer(id: Int, buffer: mutable.Queue[Int]) extends Thread {
+    override def run(): Unit = {
+      val random = new Random(System.nanoTime())
+
+      while (true) {
+        buffer.synchronized {
+          /*
+            we need to constantly check if the buffer is empty - scenario:
+              one producer, two consumers
+              producer produces 1 value in the buffer
+              both consumers are waiting
+              producer calls notify, awakens one consumer
+              consumer dequeues, calls notify, awakens the other consumer
+              the other consumer awakens, tries dequeuing, CRASH
+           */
+          while (buffer.isEmpty) {
+            println(s"[consumer $id] buffer empty, waiting...")
+            buffer.wait()
+          }
+
+          // buffer is non-empty
+          val newValue = buffer.dequeue()
+          println(s"[consumer $id] consumed $newValue")
+
+          // notify a producer
+          /*
+            We need to use notifyAll. Otherwise:
+              Scenario: 2 producers, one consumer, capacity = 1
+                producer1 produces a value, then waits
+                producer2 sees buffer full, waits
+                consumer consumes value, notifies one producer (producer1)
+                consumer sees buffer empty, wait
+                producer1 produces a value, calls notify - signal goes to producer2
+                producer1 sees buffer full, waits
+                producer2 sees buffer full, waits
+                deadlock
+           */
+          buffer.notifyAll() // signal all the waiting threads on the buffer
+        }
+
+        Thread.sleep(random.nextInt(500))
+      }
+    }
+  }
+
+  class Producer(id: Int, buffer: mutable.Queue[Int], capacity: Int) extends Thread {
+    override def run(): Unit = {
+      val random = new Random(System.nanoTime())
+      var currentCount = 0
+
+      while (true) {
+        buffer.synchronized {
+          while (buffer.size == capacity) { // buffer full
+            println(s"[producer $id] buffer is full, waiting...")
+            buffer.wait()
+          }
+
+          // there is space in the buffer
+          println(s"[producer $id] producing $currentCount")
+          buffer.enqueue(currentCount)
+
+          // wake up a consumer
+          buffer.notifyAll()
+
+          currentCount += 1
+        }
+
+        Thread.sleep(random.nextInt(500))
+      }
+    }
+  }
+
+  def start(nProducers: Int, nConsumers: Int, containerCapacity: Int): Unit = {
+    val buffer: mutable.Queue[Int] = new mutable.Queue[Int]
+    val producers = (1 to nProducers).map(id => new Producer(id, buffer, containerCapacity))
+    val consumers = (1 to nConsumers).map(id => new Consumer(id, buffer))
+
+    producers.foreach(_.start())
+    consumers.foreach(_.start())
   }
 }
