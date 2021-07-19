@@ -1,7 +1,7 @@
 package com.rockthejvm.part3async
 
 import java.util.concurrent.Executors
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.{Failure, Random, Success, Try}
 import scala.concurrent.duration.*
 
@@ -120,7 +120,8 @@ object Futures {
   val fallBackProfile: Future[Profile] = SocialNetwork.fetchProfile("unknown id").fallbackTo(SocialNetwork.fetchProfile("rtjvm.id.0-dummy"))
 
   /*
-    Block for a future
+    Block calling thread for future completion.
+    Example: a transaction that must go through.
    */
   case class User(name: String)
   case class Transaction(sender: String, receiver: String, amount: Double, status: String)
@@ -151,16 +152,42 @@ object Futures {
         transaction <- createTransaction(user, merchantName, price)
       } yield transaction.status
 
-      // blocking call
+      // blocking call - not recommended unless in VERY STRICT circumstances
       Await.result(transactionStatusFuture, 2.seconds) // throws TimeoutException if the future doesn't finish within 2s
     }
   }
 
+  /*
+    Promises
+   */
+  def demoPromises(): Unit = {
+    val promise = Promise[Int]()
+    val futureInside: Future[Int] = promise.future
+
+    // thread 1 - "consumer": monitor the future for completion
+    futureInside.onComplete {
+      case Success(value) => println(s"[consumer] I've just been completed with $value")
+      case Failure(ex) => ex.printStackTrace()
+    }
+
+    // thread 2 - "producer"
+    val producerThread = new Thread(() => {
+      println("[producer] Crunching numbers...")
+      Thread.sleep(1000)
+      // "fulfil" the promise
+      promise.success(42)
+      println("[producer] I'm done.")
+    })
+
+    producerThread.start()
+  }
+
   def main(args: Array[String]): Unit = {
-    sendMessageToBestFriend_v3("rtjvm.id.2-jane", "Hey best friend, nice to talk to you again!")
-    println("purchasing...")
-    println(BankingApp.purchase("daniel-234", "shoes", "merchan-987", 3.56))
-    println("purchase complete")
+//    sendMessageToBestFriend_v3("rtjvm.id.2-jane", "Hey best friend, nice to talk to you again!")
+//    println("purchasing...")
+//    println(BankingApp.purchase("daniel-234", "shoes", "merchan-987", 3.56))
+//    println("purchase complete")
+    demoPromises()
     Thread.sleep(2000)
     executor.shutdown()
   }
