@@ -1,9 +1,9 @@
 package com.rockthejvm.part3async
 
 import java.util.concurrent.Executors
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Random, Success, Try}
+import scala.concurrent.duration.*
 
 object Futures {
 
@@ -119,8 +119,48 @@ object Futures {
 
   val fallBackProfile: Future[Profile] = SocialNetwork.fetchProfile("unknown id").fallbackTo(SocialNetwork.fetchProfile("rtjvm.id.0-dummy"))
 
+  /*
+    Block for a future
+   */
+  case class User(name: String)
+  case class Transaction(sender: String, receiver: String, amount: Double, status: String)
+
+  object BankingApp {
+    // "APIs"
+    def fetchUser(name: String): Future[User] = Future {
+      // simulate some DB fetching
+      Thread.sleep(500)
+      User(name)
+    }
+
+    def createTransaction(user: User, merchantName: String, amount: Double): Future[Transaction] = Future {
+      // simulate payment
+      Thread.sleep(1000)
+      Transaction(user.name, merchantName, amount, "SUCCESS")
+    }
+
+    // "external API"
+    def purchase(username: String, item: String, merchantName: String, price: Double): String = {
+      /*
+        1. fetch user
+        2. create transaction
+        3. WAIT for the txn to finish
+       */
+      val transactionStatusFuture: Future[String] = for {
+        user <- fetchUser(username)
+        transaction <- createTransaction(user, merchantName, price)
+      } yield transaction.status
+
+      // blocking call
+      Await.result(transactionStatusFuture, 2.seconds) // throws TimeoutException if the future doesn't finish within 2s
+    }
+  }
+
   def main(args: Array[String]): Unit = {
     sendMessageToBestFriend_v3("rtjvm.id.2-jane", "Hey best friend, nice to talk to you again!")
+    println("purchasing...")
+    println(BankingApp.purchase("daniel-234", "shoes", "merchan-987", 3.56))
+    println("purchase complete")
     Thread.sleep(2000)
     executor.shutdown()
   }
