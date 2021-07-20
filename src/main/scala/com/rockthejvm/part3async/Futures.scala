@@ -33,7 +33,8 @@ object Futures {
   } // on SOME other thread
 
   /*
-    Functional composition
+    Functional Programming on Futures
+    Motivation: onComplete is a hassle
    */
   case class Profile(id: String, name: String) {
     def sendMessage(anotherProfile: Profile, message: String) =
@@ -84,10 +85,8 @@ object Futures {
         }
       case Failure(ex) => ex.printStackTrace()
     }
-  }
+  } // onComplete is such a pain - callback hell!
 
-  // onComplete is a hassle.
-  // solution: functional composition
   def sendMessageToBestFriend_v2(accountId: String, message: String): Unit = {
     val profileFuture = SocialNetwork.fetchProfile(accountId)
     val action = profileFuture.flatMap { profile => // Future[Unit]
@@ -120,7 +119,7 @@ object Futures {
   val fallBackProfile: Future[Profile] = SocialNetwork.fetchProfile("unknown id").fallbackTo(SocialNetwork.fetchProfile("rtjvm.id.0-dummy"))
 
   /*
-    Block calling thread for future completion.
+    Blocking the calling thread for future completion
     Example: a transaction that must go through.
    */
   case class User(name: String)
@@ -158,7 +157,7 @@ object Futures {
   }
 
   /*
-    Promises
+    Promises: a technique for controlling the completion of Futures
    */
   def demoPromises(): Unit = {
     val promise = Promise[Int]()
@@ -182,12 +181,84 @@ object Futures {
     producerThread.start()
   }
 
+  /**
+    Exercises
+    1) fulfil a future IMMEDIATELY with a value
+    2) in sequence: make sure the first Future has been completed before returning the second
+    3) first(fa, fb) => new Future with the value of the first Future to complete
+    4) last(fa, fb) => new Future with the value of the LAST Future to complete
+    5) retry an action returning a Future until a predicate holds true
+   */
+
+  // 1
+  def completeImmediately[A](value: A): Future[A] = Future(value) // async completion as soon as possible
+  def completeImmediately_v2[A](value: A): Future[A] = Future.successful(value) // synchronous completion
+
+  // 2
+  def inSequence[A, B](first: Future[A], second: Future[B]): Future[B] =
+    first.flatMap(_ => second)
+
+  // 3
+  def first[A](f1: Future[A], f2: Future[A]): Future[A] = {
+    val promise = Promise[A]()
+    f1.onComplete(result1 => promise.tryComplete(result1))
+    f2.onComplete(result2 => promise.tryComplete(result2))
+
+    promise.future
+  }
+
+  // 4
+  def last[A](f1: Future[A], f2: Future[A]): Future[A] = {
+    val bothPromise = Promise[A]()
+    val lastPromise = Promise[A]()
+
+    def checkAndComplete(result: Try[A]): Unit =
+      if (!bothPromise.tryComplete(result))
+        lastPromise.complete(result)
+
+    f1.onComplete(checkAndComplete)
+    f2.onComplete(checkAndComplete)
+
+    lastPromise.future
+  }
+
+  def testFirstLast(): Unit = {
+    lazy val fast = Future {
+      Thread.sleep(100)
+      1
+    }
+    lazy val slow = Future {
+      Thread.sleep(200)
+      2
+    }
+    first(fast, slow).foreach(result => println(s"FIRST: $result"))
+    last(fast, slow).foreach(result => println(s"LAST: $result"))
+  }
+
+  // 5
+  def retryUntil[A](action: () => Future[A], predicate: A => Boolean): Future[A] =
+    action()
+      .filter(predicate)
+      .recoverWith {
+        case _ => retryUntil(action, predicate)
+      }
+
+  def testRetries(): Unit = {
+    val random = new Random()
+    val action = () => Future {
+      Thread.sleep(100)
+      val nextValue = random.nextInt(100)
+      println(s"Generated $nextValue")
+      nextValue
+    }
+
+    val predicate = (x: Int) => x < 10
+
+    retryUntil(action, predicate).foreach(finalResult => println(s"Settled at $finalResult"))
+  }
+
   def main(args: Array[String]): Unit = {
-//    sendMessageToBestFriend_v3("rtjvm.id.2-jane", "Hey best friend, nice to talk to you again!")
-//    println("purchasing...")
-//    println(BankingApp.purchase("daniel-234", "shoes", "merchan-987", 3.56))
-//    println("purchase complete")
-    demoPromises()
+    testRetries()
     Thread.sleep(2000)
     executor.shutdown()
   }
