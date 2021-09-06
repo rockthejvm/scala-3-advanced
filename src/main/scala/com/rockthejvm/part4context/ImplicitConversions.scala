@@ -25,8 +25,9 @@ object ImplicitConversions {
   val isJaneOk = processPerson("Jane") // ok - compiler rewrites to processPerson(Person("Jane"))
 
   /*
-    - auto-box types
-    - use multiple types for the same code interchangeably
+    Use-cases for implicit conversions
+      - auto-box types
+      - use multiple (often unrelated) types with the same meaning in your code, interchangeably
    */
 
   def main(args: Array[String]): Unit = {
