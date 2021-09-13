@@ -99,7 +99,7 @@ object HigherKindedTypes {
   extension [F[_], A](container: F[A])(using magic: Monad[F])
     def flatMap[B](f: A => F[B]): F[B] = magic.flatMap(container)(f)
 
-  def combine_v2[F[_] : Monad, A, B](fa: F[A], fb: F[B]): F[(A, B)]
+  def combine_v2[F[_] : Monad, A, B](fa: F[A], fb: F[B]): F[(A, B)] =
     for {
       a <- fa
       b <- fb
