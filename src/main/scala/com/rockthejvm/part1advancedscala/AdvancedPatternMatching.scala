@@ -1,7 +1,5 @@
 package com.rockthejvm.part1advancedscala
 
-import com.rockthejvm.part1as.AdvancedPatternMatching.PersonWrapper
-
 import java.util.NoSuchElementException
 
 object AdvancedPatternMatching {
