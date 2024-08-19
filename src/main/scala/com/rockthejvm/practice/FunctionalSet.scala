@@ -2,7 +2,6 @@ package com.rockthejvm.practice
 
 import scala.annotation.tailrec
 
-
 abstract class FSet[A] extends (A => Boolean) {
   // main api
   def contains(elem: A): Boolean
@@ -23,7 +22,7 @@ abstract class FSet[A] extends (A => Boolean) {
   infix def &(anotherSet: FSet[A]): FSet[A]
 
   // "negation" == all the elements of type A EXCEPT the elements in this set
-  def unary_! : FSet[A] = new PBSet(x => !contains(x))
+  def unary_! : FSet[A] = new PBSet(!contains(_))
 }
 
 // example { x in N | x % 2 == 0 }

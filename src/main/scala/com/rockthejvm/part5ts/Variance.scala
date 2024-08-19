@@ -38,7 +38,7 @@ object Variance {
   val myVet: Vet[Dog] = new Vet[Animal] {
     override def heal(animal: Animal) = {
       println("Hey there, you're all good...")
-      return true
+      true
     }
   }
   // if the vet can treat any animal, she/he can treat my dog too

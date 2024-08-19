@@ -13,6 +13,7 @@ object AdvancedPatternMatching {
     - case classes
    */
 
+  // use-case: you want to pattern match against an existing class (maybe from a Java library)
   class Person(val name: String, val age: Int)
 
   object Person {
