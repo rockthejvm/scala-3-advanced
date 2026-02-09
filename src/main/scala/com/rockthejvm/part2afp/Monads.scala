@@ -63,8 +63,8 @@ object Monads {
       = Option(43).flatMap(x => Option(2 * x)
       = Option(86)
 
-      anOption.flatMap(x => f(x).flatMap(g)) = Option(42).flatMap(x => Option(x + 1).flatMap(y => 2 * y)))
-      = Option(42).flatMap(x => 2 * x + 2)
+      anOption.flatMap(x => f(x).flatMap(g)) = Option(42).flatMap(x => Option(x + 1).flatMap(y => Option(2 * y))))
+      = Option(42).flatMap(x => Option(2 * x + 2))
       = Option(86)
      */
     val associativity = anOption.flatMap(f).flatMap(g) == anOption.flatMap(x => f(x).flatMap(g)) // for any option, f and g
